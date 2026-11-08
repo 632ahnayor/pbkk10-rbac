@@ -96,6 +96,8 @@ Nama mahasiswa dan isi project dibuat Faker. Email mahasiswa memakai nomor yang 
 
 `DatabaseSeeder` juga memanggil `DemoUserSeeder` agar empat akun demo Minggu 5 tetap tersedia. Seeder membuat akun demo tambahan `dosenpbkk@its.ac.id` dengan role `dosen` dan dua project portofolio siap presentasi. Password lokal akun demo adalah `password`.
 
+Untuk demo cepat, pada environment `local`, halaman Login menyediakan tombol **Minggu 6: Mahasiswa 01**. Tombol ini mengautentikasi akun `week6.mahasiswa.01@student.its.ac.id` (password akun seed: `password`) sehingga project milik akun tersebut dapat langsung dilihat di dashboard. Quick login tidak tersedia di luar environment `local`.
+
 ### 4. Menjalankan dan memverifikasi database
 
 Setelah konfigurasi database lokal siap, jalankan migration dan seeder:

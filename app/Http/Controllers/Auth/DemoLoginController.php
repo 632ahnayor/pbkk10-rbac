@@ -19,6 +19,7 @@ class DemoLoginController extends Controller
             'budi' => 'budi@example.com',
             'asdos' => 'asdos@example.com',
             'dosen' => 'dosen@example.com',
+            'week6-mahasiswa-01' => 'week6.mahasiswa.01@student.its.ac.id',
         ];
 
         abort_unless(isset($demoAccounts[$account]), 404);

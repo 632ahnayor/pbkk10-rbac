@@ -49,7 +49,7 @@
         <section class="mt-6 border-t border-gray-200 pt-4" aria-labelledby="demo-login-heading">
             <h2 id="demo-login-heading" class="text-sm font-medium text-gray-700">Quick login akun demo</h2>
             <div class="mt-3 grid grid-cols-2 gap-2">
-                @foreach (['andi' => 'Andi (Mahasiswa)', 'budi' => 'Budi (Mahasiswa)', 'asdos' => 'Asdos', 'dosen' => 'Dosen'] as $account => $label)
+                @foreach (['andi' => 'Andi (Mahasiswa)', 'budi' => 'Budi (Mahasiswa)', 'asdos' => 'Asdos', 'dosen' => 'Dosen', 'week6-mahasiswa-01' => 'Minggu 6: Mahasiswa 01'] as $account => $label)
                     <form method="POST" action="{{ route('login.demo', ['account' => $account]) }}">
                         @csrf
                         <button class="inline-flex w-full justify-center rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500" type="submit">

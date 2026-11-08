@@ -65,3 +65,46 @@ it('shows only the authenticated users projects on the dashboard', function () {
         ->assertSee($ownerProject->judul)
         ->assertDontSee('Project Milik Orang Lain');
 });
+
+it('provides a week six database navigation link for guests and authenticated users', function () {
+    $this->get(route('home'))
+        ->assertOk()
+        ->assertSee('Minggu 6')
+        ->assertSee('Login untuk Demo Database')
+        ->assertSee('href="'.route('login').'"', false);
+
+    $user = User::factory()->create(['role' => 'mahasiswa']);
+
+    $this->actingAs($user)
+        ->get(route('home'))
+        ->assertOk()
+        ->assertSee('Minggu 6')
+        ->assertSee('Demo Database')
+        ->assertSee('href="'.route('dashboard').'"', false);
+});
+
+it('quick logs into the first week six student from the local login page', function () {
+    $this->app['env'] = 'local';
+    $this->seed();
+
+    $student = User::where('email', 'week6.mahasiswa.01@student.its.ac.id')->firstOrFail();
+
+    $this->get(route('login'))
+        ->assertOk()
+        ->assertSee('Minggu 6: Mahasiswa 01')
+        ->assertSee(route('login.demo', ['account' => 'week6-mahasiswa-01']));
+
+    $this->post(route('login.demo', ['account' => 'week6-mahasiswa-01']), ['_token' => session()->token()])
+        ->assertRedirect(route('dashboard', absolute: false));
+
+    $this->assertAuthenticatedAs($student);
+});
+
+it('does not allow quick login as a week six student outside the local environment', function () {
+    $this->app['env'] = 'testing';
+
+    $this->post(route('login.demo', ['account' => 'week6-mahasiswa-01']))
+        ->assertNotFound();
+
+    $this->assertGuest();
+});

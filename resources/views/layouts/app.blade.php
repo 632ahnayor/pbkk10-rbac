@@ -362,7 +362,16 @@
                     @endauth
                 </div>
             </details>
-            
+            <details class="nav-menu">
+                <summary>Minggu 6</summary>
+                <div class="nav-menu-options">
+                    @auth
+                        <a href="{{ route('dashboard') }}">Demo Database</a>
+                    @else
+                        <a href="{{ route('login') }}">Login untuk Demo Database</a>
+                    @endauth
+                </div>
+            </details>
         </div>
 
         <div class="navbar-actions">
