@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Project;
+use App\Models\Proposal;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 
@@ -13,16 +14,19 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        $this->call(DemoUserSeeder::class);
+        $this->call([
+            RoleAndPermissionSeeder::class,
+            DemoUserSeeder::class,
+        ]);
 
         $wira = User::firstOrCreate(
             ['email' => 'wira@student.its.ac.id'],
             [
                 'name' => 'Wira Mahasiswa',
-                'role' => 'mahasiswa',
                 'password' => 'password',
             ]
         );
+        $wira->syncRoles(['mahasiswa']);
 
         $wira->projects()->firstOrCreate(
             ['judul' => 'Asisten Akademik'],
@@ -38,10 +42,10 @@ class DatabaseSeeder extends Seeder
                 ['email' => sprintf('week6.mahasiswa.%02d@student.its.ac.id', $number)],
                 [
                     'name' => fake()->name(),
-                    'role' => 'mahasiswa',
                     'password' => 'password',
                 ]
             );
+            $student->syncRoles(['mahasiswa']);
 
             $projectsToCreate = max(0, 2 - $student->projects()->count());
 
@@ -50,16 +54,25 @@ class DatabaseSeeder extends Seeder
                     Project::factory()->count($projectsToCreate)->make()
                 );
             }
+
+            // Minggu 10: proposal dummy Faker untuk demo pencarian, filter, dan pagination admin.
+            $proposalsToCreate = max(0, 2 - $student->proposals()->count());
+
+            if ($proposalsToCreate > 0) {
+                $student->proposals()->saveMany(
+                    Proposal::factory()->count($proposalsToCreate)->make(['user_id' => $student->id])
+                );
+            }
         }
 
         $demoLecturer = User::firstOrCreate(
             ['email' => 'dosenpbkk@its.ac.id'],
             [
                 'name' => 'Dosen PBKK',
-                'role' => 'dosen',
                 'password' => 'password',
             ]
         );
+        $demoLecturer->syncRoles(['dosen']);
 
         foreach ([
             [

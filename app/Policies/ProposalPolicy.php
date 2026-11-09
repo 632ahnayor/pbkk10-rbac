@@ -9,6 +9,6 @@ class ProposalPolicy
 {
     public function update(User $user, Proposal $proposal): bool
     {
-        return $user->role === 'mahasiswa' && $user->id === $proposal->user_id;
+        return $user->hasRole('mahasiswa') && $user->id === $proposal->user_id;
     }
 }

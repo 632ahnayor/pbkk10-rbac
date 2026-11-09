@@ -15,6 +15,8 @@ class DemoLoginController extends Controller
         abort_unless(app()->environment('local'), 404);
 
         $demoAccounts = [
+            'admin' => 'admin@example.com',
+            'staf' => 'staf@example.com',
             'andi' => 'andi@example.com',
             'budi' => 'budi@example.com',
             'asdos' => 'asdos@example.com',
@@ -29,6 +31,6 @@ class DemoLoginController extends Controller
         Auth::login($user);
         $request->session()->regenerate();
 
-        return redirect()->intended(route('dashboard', absolute: false));
+        return redirect()->intended(route($user->homeRoute(), absolute: false));
     }
 }

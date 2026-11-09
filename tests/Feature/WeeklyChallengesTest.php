@@ -8,7 +8,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 uses(RefreshDatabase::class);
 
 it('limits each student to three proposal submissions per minute', function () {
-    $student = User::factory()->create(['role' => 'mahasiswa']);
+    $student = User::factory()->withRole('mahasiswa')->create();
     $this->actingAs($student);
 
     foreach (['Proposal One', 'Proposal Two', 'Proposal Three'] as $title) {
@@ -23,7 +23,7 @@ it('limits each student to three proposal submissions per minute', function () {
 });
 
 it('keeps proposal submission limits isolated per student', function () {
-    $firstStudent = User::factory()->create(['role' => 'mahasiswa']);
+    $firstStudent = User::factory()->withRole('mahasiswa')->create();
 
     $this->actingAs($firstStudent);
     foreach (['First One', 'First Two', 'First Three'] as $title) {
@@ -31,7 +31,7 @@ it('keeps proposal submission limits isolated per student', function () {
             ->assertRedirect(route('dashboard'));
     }
 
-    $secondStudent = User::factory()->create(['role' => 'mahasiswa']);
+    $secondStudent = User::factory()->withRole('mahasiswa')->create();
     $this->actingAs($secondStudent)
         ->post(route('proposals.store'), ['title' => 'Second Student Proposal'])
         ->assertRedirect(route('dashboard'));
@@ -43,7 +43,7 @@ it('shows quick login buttons only in the local environment', function () {
     $this->app['env'] = 'local';
 
     $response = $this->get(route('login'))->assertOk();
-    foreach (['andi', 'budi', 'asdos', 'dosen'] as $account) {
+    foreach (['admin', 'staf', 'andi', 'budi', 'asdos', 'dosen'] as $account) {
         $response->assertSee(route('login.demo', ['account' => $account]))
             ->assertSee('name="_token"', false);
     }
@@ -54,7 +54,7 @@ it('shows quick login buttons only in the local environment', function () {
         ->assertDontSee(route('login.demo', ['account' => 'andi']));
 });
 
-it('quick logs into only the seeded demo account in local environment', function (string $account, string $email, string $role) {
+it('quick logs into only the seeded demo account in local environment', function (string $account, string $email, string $role, string $homeRoute) {
     $this->app['env'] = 'local';
     $this->seed(DemoUserSeeder::class);
 
@@ -64,16 +64,18 @@ it('quick logs into only the seeded demo account in local environment', function
     $csrfToken = session()->token();
 
     $this->post(route('login.demo', ['account' => $account]), ['_token' => $csrfToken])
-        ->assertRedirect(route('dashboard', absolute: false));
+        ->assertRedirect(route($homeRoute, absolute: false));
     $this->assertAuthenticatedAs($user);
 
-    expect($user->role)->toBe($role)
+    expect($user->hasRole($role))->toBeTrue()
         ->and(session()->getId())->not->toBe($sessionIdBeforeLogin);
 })->with([
-    'Andi' => ['andi', 'andi@example.com', 'mahasiswa'],
-    'Budi' => ['budi', 'budi@example.com', 'mahasiswa'],
-    'Asdos' => ['asdos', 'asdos@example.com', 'asdos'],
-    'Dosen' => ['dosen', 'dosen@example.com', 'dosen'],
+    'Andi' => ['andi', 'andi@example.com', 'mahasiswa', 'dashboard'],
+    'Budi' => ['budi', 'budi@example.com', 'mahasiswa', 'dashboard'],
+    'Asdos' => ['asdos', 'asdos@example.com', 'asdos', 'admin.dashboard'],
+    'Dosen' => ['dosen', 'dosen@example.com', 'dosen', 'admin.dashboard'],
+    'Admin' => ['admin', 'admin@example.com', 'admin', 'admin.dashboard'],
+    'Staf' => ['staf', 'staf@example.com', 'staf', 'admin.dashboard'],
 ]);
 
 it('does not expose quick login outside local or allow arbitrary account names', function () {

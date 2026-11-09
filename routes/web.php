@@ -1,6 +1,7 @@
 <?php
 
-use App\Http\Controllers\AdminController;
+use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
+use App\Http\Controllers\Admin\ProposalController as AdminProposalController;
 use App\Http\Controllers\AgentController;
 use App\Http\Controllers\Auth\DemoLoginController;
 use App\Http\Controllers\DashboardController;
@@ -54,7 +55,7 @@ Route::post('/login/as/{account}', DemoLoginController::class)
     ->middleware('guest')
     ->name('login.demo');
 
-Route::middleware(['auth', 'cek.peran:mahasiswa'])->group(function () {
+Route::middleware(['auth', 'role:mahasiswa'])->group(function () {
     Route::get('/proposals/create', [ProposalController::class, 'create'])
         ->name('proposals.create');
     Route::post('/proposals', [ProposalController::class, 'store'])
@@ -68,9 +69,12 @@ Route::middleware(['auth', 'cek.peran:mahasiswa'])->group(function () {
 
 Route::prefix('admin')
     ->name('admin.')
-    ->middleware(['auth', 'cek.peran:dosen,asdos'])
+    ->middleware(['auth', 'role:admin|staf|dosen|asdos'])
     ->group(function () {
-        Route::get('/', AdminController::class)->name('index');
+        Route::redirect('/', '/admin/dashboard')->name('index');
+        Route::get('/dashboard', AdminDashboardController::class)->name('dashboard');
+        Route::get('/proposals', [AdminProposalController::class, 'index'])->name('proposals.index');
+        Route::delete('/proposals/{proposal}', [AdminProposalController::class, 'destroy'])->name('proposals.destroy');
         Route::get('/grades', [GradeController::class, 'index'])->name('grades.index');
         Route::patch('/grades/{proposal}', [GradeController::class, 'update'])->name('grades.update');
     });

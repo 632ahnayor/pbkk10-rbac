@@ -40,8 +40,10 @@ class RegisteredUserController extends Controller
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
-            'role' => 'mahasiswa',
         ]);
+
+        // Peran ditetapkan server, bukan dari input form.
+        $user->assignRole('mahasiswa');
 
         event(new Registered($user));
 

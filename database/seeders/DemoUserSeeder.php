@@ -10,6 +10,8 @@ class DemoUserSeeder extends Seeder
     public function run(): void
     {
         foreach ([
+            ['name' => 'Admin', 'email' => 'admin@example.com', 'role' => 'admin'],
+            ['name' => 'Staf', 'email' => 'staf@example.com', 'role' => 'staf'],
             ['name' => 'Andi', 'email' => 'andi@example.com', 'role' => 'mahasiswa'],
             ['name' => 'Budi', 'email' => 'budi@example.com', 'role' => 'mahasiswa'],
             ['name' => 'Asdos', 'email' => 'asdos@example.com', 'role' => 'asdos'],
@@ -17,8 +19,8 @@ class DemoUserSeeder extends Seeder
         ] as $demoUser) {
             User::updateOrCreate(
                 ['email' => $demoUser['email']],
-                [...$demoUser, 'password' => 'password', 'email_verified_at' => now()],
-            );
+                ['name' => $demoUser['name'], 'password' => 'password', 'email_verified_at' => now()],
+            )->syncRoles([$demoUser['role']]);
         }
     }
 }

@@ -1,34 +1,39 @@
-<x-app-layout>
-    <x-slot name="header">
-        <h2 class="text-xl font-semibold leading-tight text-gray-800">Input Nilai Proposal</h2>
-    </x-slot>
+@extends('adminlte::page')
 
-    <div class="py-12">
-        <div class="mx-auto max-w-7xl space-y-4 sm:px-6 lg:px-8">
-            @if (session('status'))
-                <p class="rounded-md bg-green-100 p-4 text-green-800" role="status">{{ session('status') }}</p>
-            @endif
+@section('title', 'Input Nilai')
+
+@section('content_header')
+    <h1>Input Nilai Proposal</h1>
+@endsection
+
+@section('content')
+    @if (session('status'))
+        <x-adminlte-alert theme="success" dismissable>{{ session('status') }}</x-adminlte-alert>
+    @endif
+
+    <div class="card">
+        <ul class="list-group list-group-flush">
             @forelse ($proposals as $proposal)
-                <article class="flex flex-wrap items-center justify-between gap-4 rounded-lg bg-white p-6 shadow-sm">
+                <li class="list-group-item d-flex flex-wrap align-items-center justify-content-between gap-3">
                     <div>
-                        <h3 class="font-semibold text-gray-900">{{ $proposal->title }}</h3>
-                        <p class="mt-1 text-sm text-gray-600">{{ $proposal->user->name }} · Nilai saat ini: {{ $proposal->grade ?? 'Belum dinilai' }}</p>
+                        <h2 class="h6 mb-1">{{ $proposal->title }}</h2>
+                        <small class="text-body-secondary">{{ $proposal->user->name }} · Nilai saat ini: {{ $proposal->grade ?? 'Belum dinilai' }}</small>
                     </div>
                     @can('kelola-nilai')
-                        <form method="POST" action="{{ route('admin.grades.update', $proposal) }}" class="flex items-end gap-3">
+                        <form method="POST" action="{{ route('admin.grades.update', $proposal) }}" class="d-flex align-items-end gap-2">
                             @csrf
                             @method('PATCH')
                             <div>
-                                <label for="grade-{{ $proposal->id }}" class="block text-sm font-medium text-gray-700">Nilai (0–100)</label>
-                                <input id="grade-{{ $proposal->id }}" name="grade" type="number" min="0" max="100" step="0.01" value="{{ old('grade', $proposal->grade) }}" required class="mt-1 w-32 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                <label for="grade-{{ $proposal->id }}" class="form-label small mb-1">Nilai (0–100)</label>
+                                <input id="grade-{{ $proposal->id }}" name="grade" type="number" min="0" max="100" step="0.01" value="{{ old('grade', $proposal->grade) }}" required class="form-control form-control-sm" style="width: 8rem">
                             </div>
-                            <x-primary-button>Simpan</x-primary-button>
+                            <button type="submit" class="btn btn-sm btn-primary">Simpan</button>
                         </form>
                     @endcan
-                </article>
+                </li>
             @empty
-                <p class="rounded-lg bg-white p-6 text-gray-600 shadow-sm">Belum ada proposal untuk dinilai.</p>
+                <li class="list-group-item text-body-secondary">Belum ada proposal untuk dinilai.</li>
             @endforelse
-        </div>
+        </ul>
     </div>
-</x-app-layout>
+@endsection

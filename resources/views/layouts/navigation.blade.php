@@ -15,21 +15,16 @@
                     <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
                         {{ __('Dashboard') }}
                     </x-nav-link>
-                    @if (Auth::user()->role === 'mahasiswa')
+                    @role('mahasiswa')
                         <x-nav-link :href="route('proposals.create')" :active="request()->routeIs('proposals.*')">
                             {{ __('Buat Proposal') }}
                         </x-nav-link>
-                    @endif
-                    @can('kelola-nilai')
-                        <x-nav-link :href="route('admin.grades.index')" :active="request()->routeIs('admin.grades.*')">
-                            {{ __('Input Nilai') }}
+                    @endrole
+                    @hasanyrole(App\Models\User::PANEL_ROLES)
+                        <x-nav-link :href="route('admin.dashboard')" :active="request()->routeIs('admin.*')">
+                            {{ __('Panel Admin') }}
                         </x-nav-link>
-                    @endcan
-                    @if (in_array(Auth::user()->role, ['dosen', 'asdos'], true))
-                        <x-nav-link :href="route('admin.index')" :active="request()->routeIs('admin.index')">
-                            {{ __('Tinjau Proposal') }}
-                        </x-nav-link>
-                    @endif
+                    @endhasanyrole
                 </div>
             </div>
 

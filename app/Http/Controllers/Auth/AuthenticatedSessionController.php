@@ -28,7 +28,8 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
-        return redirect()->intended(route('dashboard', absolute: false));
+        // Admin/staf/dosen/asdos diarahkan ke panel AdminLTE, mahasiswa ke dashboard portal.
+        return redirect()->intended(route($request->user()->homeRoute(), absolute: false));
     }
 
     /**

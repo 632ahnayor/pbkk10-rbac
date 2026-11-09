@@ -2,10 +2,8 @@
 
 namespace App\Providers;
 
-use App\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
@@ -24,8 +22,6 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        Gate::define('kelola-nilai', fn (User $user): bool => in_array($user->role, ['dosen', 'asdos'], true));
-
         RateLimiter::for('proposal-submissions', fn (Request $request): Limit => Limit::perMinute(3)
             ->by('proposal-submissions:'.$request->user()->getAuthIdentifier()));
     }

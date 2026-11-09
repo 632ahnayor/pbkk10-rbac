@@ -18,10 +18,9 @@ it('registers new users as mahasiswa even when a privileged role is submitted', 
     ])->assertRedirect(route('dashboard', absolute: false));
 
     $this->assertAuthenticated();
-    $this->assertDatabaseHas('users', [
-        'email' => 'new-student@example.com',
-        'role' => 'mahasiswa',
-    ]);
+
+    $user = User::where('email', 'new-student@example.com')->firstOrFail();
+    expect($user->getRoleNames()->all())->toBe(['mahasiswa']);
 });
 
 it('seeds the requested demo users with their roles and shared password', function () {
@@ -32,11 +31,13 @@ it('seeds the requested demo users with their roles and shared password', functi
         'budi@example.com' => ['Budi', 'mahasiswa'],
         'asdos@example.com' => ['Asdos', 'asdos'],
         'dosen@example.com' => ['Dosen', 'dosen'],
+        'admin@example.com' => ['Admin', 'admin'],
+        'staf@example.com' => ['Staf', 'staf'],
     ] as $email => [$name, $role]) {
         $user = User::where('email', $email)->firstOrFail();
 
         expect($user->name)->toBe($name)
-            ->and($user->role)->toBe($role)
+            ->and($user->getRoleNames()->all())->toBe([$role])
             ->and(Hash::check('password', $user->password))->toBeTrue();
     }
 });
@@ -44,13 +45,18 @@ it('seeds the requested demo users with their roles and shared password', functi
 it('authenticates the seeded users through the Breeze login form', function () {
     $this->seed(DemoUserSeeder::class);
 
-    foreach (['andi', 'budi', 'asdos', 'dosen'] as $username) {
+    foreach ([
+        'andi' => 'dashboard',
+        'budi' => 'dashboard',
+        'asdos' => 'admin.dashboard',
+        'dosen' => 'admin.dashboard',
+    ] as $username => $expectedRoute) {
         $user = User::where('email', $username.'@example.com')->firstOrFail();
 
         $this->post(route('login'), [
             'email' => $user->email,
             'password' => 'password',
-        ])->assertRedirect(route('dashboard', absolute: false));
+        ])->assertRedirect(route($expectedRoute, absolute: false));
 
         $this->assertAuthenticatedAs($user);
         $this->post(route('logout'));
@@ -59,23 +65,23 @@ it('authenticates the seeded users through the Breeze login form', function () {
 });
 
 it('protects admin routes from guests and students but allows asdos and dosen', function () {
-    $this->get(route('admin.index'))->assertRedirect(route('login'));
+    $this->get(route('admin.dashboard'))->assertRedirect(route('login'));
 
-    $student = User::factory()->create(['role' => 'mahasiswa']);
-    $this->actingAs($student)->get(route('admin.index'))->assertForbidden();
+    $student = User::factory()->withRole('mahasiswa')->create();
+    $this->actingAs($student)->get(route('admin.dashboard'))->assertForbidden();
 
     foreach (['asdos', 'dosen'] as $role) {
-        $user = User::factory()->create(['role' => $role]);
+        $user = User::factory()->withRole($role)->create();
 
         $this->actingAs($user)
-            ->get(route('admin.index'))
+            ->get(route('admin.dashboard'))
             ->assertOk();
     }
 });
 
 it('assigns new proposals to the signed-in student and restricts title edits to their owner', function () {
-    $owner = User::factory()->create(['role' => 'mahasiswa']);
-    $otherStudent = User::factory()->create(['role' => 'mahasiswa']);
+    $owner = User::factory()->withRole('mahasiswa')->create();
+    $otherStudent = User::factory()->withRole('mahasiswa')->create();
 
     $this->actingAs($owner)
         ->post(route('proposals.store'), [
@@ -98,8 +104,8 @@ it('assigns new proposals to the signed-in student and restricts title edits to 
         ->assertForbidden();
 });
 
-it('shows the grade entry navigation only to staff and allows staff to record grades', function () {
-    $student = User::factory()->create(['role' => 'mahasiswa']);
+it('shows the admin panel navigation only to staff and allows staff to record grades', function () {
+    $student = User::factory()->withRole('mahasiswa')->create();
     $proposal = Proposal::create([
         'user_id' => $student->id,
         'title' => 'AI Study Assistant',
@@ -108,13 +114,15 @@ it('shows the grade entry navigation only to staff and allows staff to record gr
     $this->actingAs($student)
         ->get(route('dashboard'))
         ->assertOk()
-        ->assertDontSee(route('admin.grades.index'));
+        ->assertDontSee(route('admin.dashboard'));
 
-    $asdos = User::factory()->create(['role' => 'asdos']);
+    $asdos = User::factory()->withRole('asdos')->create();
     $this->actingAs($asdos)
         ->get(route('dashboard'))
         ->assertOk()
-        ->assertSee(route('admin.grades.index'));
+        ->assertSee(route('admin.dashboard'));
+
+    $this->get(route('admin.grades.index'))->assertOk();
 
     $this->patch(route('admin.grades.update', $proposal), ['grade' => 92.5])
         ->assertRedirect(route('admin.grades.index'));
@@ -132,7 +140,7 @@ it('keeps the query-parameter local demo separate from authenticated users', fun
         ->assertSee('Selamat datang, Andi!');
     $this->assertGuest();
 
-    $signedInUser = User::factory()->create(['name' => 'Authenticated Student', 'role' => 'mahasiswa']);
+    $signedInUser = User::factory()->withRole('mahasiswa')->create(['name' => 'Authenticated Student']);
     $this->actingAs($signedInUser)
         ->get(route('home', ['user' => 'Andi']))
         ->assertSee('Selamat datang, Authenticated Student!');

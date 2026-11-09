@@ -1,12 +1,223 @@
 # PBKK Evolution
 
-Anggota:<br>
-Ja'far Balyan Alkarim - 50252241040<br>
-Hanif Aqil Janardana - 5025241111<br>
-Dafa Kumara Sahasika - 5025241112<br>
 Royan Habibi Alfatih - 5025241115<br>
 
 
+
+## Tugas 10: Admin Dashboard & Role-Based Access Control
+
+Tugas Minggu 10 memindahkan seluruh hak akses ke **Spatie Laravel Permission** dan membangun panel admin berbasis **AdminLTE 4**. Halaman login tetap memakai Breeze; setelah login, admin/staf/dosen/asdos diarahkan ke `/admin/dashboard`, sedangkan mahasiswa tetap ke `/dashboard`. Kolom `users.role` dari Minggu 5 dihapus karena peran kini tersimpan di tabel otorisasi Spatie.
+
+Panduan langkah demi langkah untuk mengulang perubahan ini secara manual tersedia di [docs/panduan-manual-minggu-10.md](./docs/panduan-manual-minggu-10.md).
+
+![Dashboard admin AdminLTE](./docs/screenshots/admin-dashboard.png)
+
+### 1. Instalasi dan menjalankan proyek
+
+```powershell
+composer install
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
+php artisan key:generate
+npm install
+php artisan migrate:fresh --seed
+npm run build
+composer run dev
+```
+
+`migrate:fresh --seed` membuat tabel Spatie, peran & izin, akun demo, serta data dummy Faker. Paket yang ditambahkan: `spatie/laravel-permission` dan `jeroennoten/laravel-adminlte` ([composer.json, baris 16](./composer.json#L16)). Aset AdminLTE dipublikasikan ke `public/vendor/adminlte`; Bootstrap 5 dan Bootstrap Icons dimuat dari CDN.
+
+### 2. Akun uji coba (Auto-Login Credentials)
+
+Semua akun memakai password `password`. Pada `APP_ENV=local`, halaman Login menampilkan tombol quick login untuk setiap akun berikut.
+
+| Akun | Email | Peran | Setelah login |
+| --- | --- | --- | --- |
+| Admin | `admin@example.com` | `admin` (akses penuh) | `/admin/dashboard` |
+| Staf | `staf@example.com` | `staf` (akses terbatas) | `/admin/dashboard` |
+| Dosen | `dosen@example.com` | `dosen` | `/admin/dashboard` |
+| Asdos | `asdos@example.com` | `asdos` | `/admin/dashboard` |
+| Andi / Budi | `andi@example.com` / `budi@example.com` | `mahasiswa` | `/dashboard` |
+
+- [DemoUserSeeder.php, baris 13](./database/seeders/DemoUserSeeder.php#L13): akun demo dan `syncRoles()`.
+- [DemoLoginController.php, baris 18](./app/Http/Controllers/Auth/DemoLoginController.php#L18): allowlist quick login (hanya environment `local`).
+- [login.blade.php, baris 52](./resources/views/auth/login.blade.php#L52): tombol quick login Admin dan Staf.
+
+### 3. Matriks peran dan izin (Spatie)
+
+| Permission | admin | staf | dosen | asdos | mahasiswa |
+| --- | :-: | :-: | :-: | :-: | :-: |
+| `lihat-proposal` | ✓ | ✓ | ✓ | ✓ | |
+| `kelola-nilai` | ✓ | | ✓ | ✓ | |
+| `hapus-proposal` | ✓ | | | | |
+| `ajukan-proposal` | | | | | ✓ |
+
+Matriks didefinisikan sekali di seeder, lalu disinkronkan ke tabel `roles`, `permissions`, dan `role_has_permissions`. Cek hasilnya dengan `php artisan permission:show`.
+
+- [RoleAndPermissionSeeder.php, baris 17](./database/seeders/RoleAndPermissionSeeder.php#L17): matriks peran → izin.
+- [RoleAndPermissionSeeder.php, baris 25](./database/seeders/RoleAndPermissionSeeder.php#L25): `firstOrCreate` + `syncPermissions` + reset cache Spatie.
+- [User.php, baris 20](./app/Models/User.php#L20): trait `HasRoles` pada model User.
+- [2026_11_08_070000_drop_role_from_users_table.php, baris 19](./database/migrations/2026_11_08_070000_drop_role_from_users_table.php#L19): kolom `role` lama dihapus.
+- [RegisteredUserController.php, baris 46](./app/Http/Controllers/Auth/RegisteredUserController.php#L46): user baru diberi peran `mahasiswa` oleh server.
+
+```php
+// database/seeders/RoleAndPermissionSeeder.php
+public const MATRIX = [
+    'admin' => ['lihat-proposal', 'kelola-nilai', 'hapus-proposal'],
+    'staf' => ['lihat-proposal'],
+    'dosen' => ['lihat-proposal', 'kelola-nilai'],
+    'asdos' => ['lihat-proposal', 'kelola-nilai'],
+    'mahasiswa' => ['ajukan-proposal'],
+];
+```
+
+### 4. Penguncian rute dengan middleware Spatie
+
+Alias `role`, `permission`, dan `role_or_permission` didaftarkan di `bootstrap/app.php`; alias ini menggantikan middleware kustom `cek.peran` dari Minggu 5. Grup `/admin` dikunci dengan `auth` + `role:admin|staf|dosen|asdos`, sehingga mahasiswa yang mengetik URL admin secara manual menerima HTTP 403.
+
+- [bootstrap/app.php, baris 19](./bootstrap/app.php#L19): alias middleware Spatie.
+- [routes/web.php, baris 72](./routes/web.php#L72): grup rute admin.
+- [routes/web.php, baris 58](./routes/web.php#L58): grup rute mahasiswa `role:mahasiswa`.
+
+```php
+// routes/web.php
+Route::prefix('admin')
+    ->name('admin.')
+    ->middleware(['auth', 'role:admin|staf|dosen|asdos'])
+    ->group(function () {
+        Route::get('/dashboard', AdminDashboardController::class)->name('dashboard');
+        Route::get('/proposals', [AdminProposalController::class, 'index'])->name('proposals.index');
+        Route::delete('/proposals/{proposal}', [AdminProposalController::class, 'destroy'])->name('proposals.destroy');
+        // ...
+    });
+```
+
+### 5. Pengaman Controller (server-side)
+
+Di Laravel 11+ base `Controller` tidak lagi menyediakan `$this->middleware()` di constructor seperti pada slide. Penggantinya adalah interface `HasMiddleware` dengan method statis `middleware()`. Hasilnya sama: aksi `destroy` hanya dijalankan bila user memegang izin `hapus-proposal`. Request `DELETE` dari Postman oleh staf tetap ditolak 403 walaupun tombolnya tidak terlihat.
+
+- [ProposalController.php, baris 13](./app/Http/Controllers/Admin/ProposalController.php#L13): `implements HasMiddleware`.
+- [ProposalController.php, baris 18](./app/Http/Controllers/Admin/ProposalController.php#L18): middleware `permission:` per aksi.
+- [GradeController.php, baris 15](./app/Http/Controllers/GradeController.php#L15): `Gate::authorize('kelola-nilai')`. Spatie mendaftarkan izinnya ke Gate, jadi kode Minggu 5 tetap berlaku tanpa `Gate::define` manual.
+
+```php
+// app/Http/Controllers/Admin/ProposalController.php
+class ProposalController extends Controller implements HasMiddleware
+{
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('permission:lihat-proposal', only: ['index']),
+            new Middleware('permission:hapus-proposal', only: ['destroy']),
+        ];
+    }
+}
+```
+
+### 6. Proteksi elemen UI dengan Blade directive
+
+Tombol **Hapus** hanya dirender untuk pemegang izin `hapus-proposal` (admin). Sidebar AdminLTE memakai kunci `'can'` sehingga menu **Input Nilai** tidak tampil untuk staf. Navigasi portal Breeze memakai `@role` dan `@hasanyrole`.
+
+- [proposals/index.blade.php, baris 67](./resources/views/admin/proposals/index.blade.php#L67): `@can('hapus-proposal')`.
+- [config/adminlte.php, baris 774](./config/adminlte.php#L774): menu sidebar dengan filter `'can'`.
+- [navigation.blade.php, baris 18](./resources/views/layouts/navigation.blade.php#L18): `@role('mahasiswa')` dan `@hasanyrole(...)`.
+
+```blade
+{{-- resources/views/admin/proposals/index.blade.php --}}
+@can('hapus-proposal')
+    <form method="POST" action="{{ route('admin.proposals.destroy', $proposal) }}" class="d-inline"
+        onsubmit="return confirm('Hapus proposal ini?');">
+        @csrf
+        @method('DELETE')
+        <button type="submit" class="btn btn-sm btn-danger">Hapus</button>
+    </form>
+@endcan
+```
+
+### 7. Dashboard AdminLTE dan widget statistik
+
+Seluruh halaman admin mewarisi `@extends('adminlte::page')`. Dashboard menampilkan empat widget `x-adminlte-small-box` dari kueri `count()`: total mahasiswa, total proposal, proposal belum dinilai, dan total project.
+
+- [DashboardController.php, baris 16](./app/Http/Controllers/Admin/DashboardController.php#L16): kueri agregat.
+- [dashboard.blade.php, baris 1](./resources/views/admin/dashboard.blade.php#L1): layout AdminLTE.
+- [dashboard.blade.php, baris 17](./resources/views/admin/dashboard.blade.php#L17): widget small box.
+
+```php
+// app/Http/Controllers/Admin/DashboardController.php
+return view('admin.dashboard', [
+    'totalMahasiswa' => User::role('mahasiswa')->count(),
+    'totalProposal' => Proposal::count(),
+    'proposalBelumDinilai' => Proposal::whereNull('grade')->count(),
+    'totalProject' => Project::count(),
+]);
+```
+
+### 8. Redirect login berdasarkan peran
+
+`User::homeRoute()` menentukan tujuan setelah login. Method ini dipakai oleh login Breeze dan quick login.
+
+- [User.php, baris 55](./app/Models/User.php#L55): `homeRoute()`.
+- [AuthenticatedSessionController.php, baris 32](./app/Http/Controllers/Auth/AuthenticatedSessionController.php#L32): redirect setelah login.
+
+### 9. Challenge: pencarian `when()`, filter status, dan `withQueryString()`
+
+Halaman **Proposal** di panel admin mencari judul **atau** nama mahasiswa (sub-query closure + `orWhereHas`) dan memfilter status nilai. Filter yang kosong diabaikan oleh `when()`. `withQueryString()` menjaga parameter `search` dan `status` di setiap link pagination. Kolom `title` diberi index agar pencarian lebih cepat.
+
+- [ProposalController.php, baris 26](./app/Http/Controllers/Admin/ProposalController.php#L26): kueri `when()`.
+- [ProposalController.php, baris 42](./app/Http/Controllers/Admin/ProposalController.php#L42): `paginate(10)->withQueryString()`.
+- [proposals/index.blade.php, baris 16](./resources/views/admin/proposals/index.blade.php#L16): form pencarian GET.
+- [2026_11_08_070001_add_title_index_to_proposals_table.php, baris 15](./database/migrations/2026_11_08_070001_add_title_index_to_proposals_table.php#L15): index kolom `title`.
+
+```php
+// app/Http/Controllers/Admin/ProposalController.php
+$proposals = Proposal::query()
+    ->with('user')
+    ->when($request->input('search'), function ($query, string $search) {
+        $query->where(function ($query) use ($search) {
+            $query->where('title', 'like', "%{$search}%")
+                ->orWhereHas('user', fn ($user) => $user->where('name', 'like', "%{$search}%"));
+        });
+    })
+    ->when($status === 'dinilai', fn ($query) => $query->whereNotNull('grade'))
+    ->when($status === 'belum', fn ($query) => $query->whereNull('grade'))
+    ->latest()
+    ->paginate(10)
+    ->withQueryString();
+```
+
+Contoh URL: `/admin/proposals?search=Agent&status=belum&page=2`
+
+### 10. Challenge: seeder Faker
+
+`ProposalFactory` membuat judul, deskripsi, dan nilai acak (sekitar setengahnya belum dinilai). `DatabaseSeeder` melengkapi setiap mahasiswa Minggu 6 hingga memiliki dua proposal, sehingga tersedia 30 proposal untuk demo pagination. Seeder tetap aman dijalankan ulang.
+
+- [ProposalFactory.php, baris 21](./database/factories/ProposalFactory.php#L21): atribut Faker.
+- [DatabaseSeeder.php, baris 58](./database/seeders/DatabaseSeeder.php#L58): seeding proposal per mahasiswa.
+- [UserFactory.php, baris 49](./database/factories/UserFactory.php#L49): state `withRole()` untuk tes.
+
+### 11. Pengujian
+
+[TestCase.php, baris 13](./tests/TestCase.php#L13) men-seed peran & izin untuk setiap tes yang memakai `RefreshDatabase`. [WeekTenTest.php](./tests/Feature/WeekTenTest.php) menguji:
+
+- [baris 11](./tests/Feature/WeekTenTest.php#L11): guest diarahkan ke login dan mahasiswa mendapat 403;
+- [baris 21](./tests/Feature/WeekTenTest.php#L21): angka widget dashboard;
+- [baris 39](./tests/Feature/WeekTenTest.php#L39): tombol Hapus hanya untuk admin, dan `DELETE` oleh staf ditolak di server;
+- [baris 69](./tests/Feature/WeekTenTest.php#L69): staf tidak bisa menilai;
+- [baris 78](./tests/Feature/WeekTenTest.php#L78): pencarian judul/nama dan filter status;
+- [baris 109](./tests/Feature/WeekTenTest.php#L109): link pagination mempertahankan filter;
+- [baris 123](./tests/Feature/WeekTenTest.php#L123): redirect login per peran.
+
+```powershell
+php artisan test
+php artisan test tests\Feature\WeekTenTest.php
+vendor\bin\pint --test
+```
+
+### 12. Skenario demo (maksimal 3 menit)
+
+1. Quick login **Admin**: dashboard menampilkan 4 widget, lalu buka **Proposal**, cari `Agent`, filter "Belum dinilai", dan pindah ke halaman 2 (filter tetap ada di URL).
+2. Hapus satu proposal: pesan sukses muncul dan angka widget berkurang.
+3. Logout, lalu quick login **Staf**: tombol Hapus dan menu Input Nilai tidak tampil. Membuka `/admin/grades` menghasilkan 403.
+4. Logout, lalu quick login **Andi**: diarahkan ke `/dashboard`, dan membuka `/admin/dashboard` menghasilkan 403.
 
 ## Tugas 6: Database/Migrations
 
@@ -159,6 +370,8 @@ php artisan test tests\Feature\WeekSixChallengeTest.php
 ```
 
 ## Tugas 5: Secure Academic Portal
+
+> **Catatan Minggu 10:** kolom `users.role`, middleware `cek.peran`, dan `Gate::define('kelola-nilai')` yang dijelaskan di bagian ini sudah digantikan oleh Spatie Laravel Permission. Lihat [Tugas 10](#tugas-10-admin-dashboard--role-based-access-control). Penjelasan di bawah dipertahankan sebagai dokumentasi Minggu 5; tautan baris kode menunjuk versi file saat ini.
 
 Tugas Minggu 5 mengembangkan sandbox menjadi portal akademik dengan autentikasi Breeze dan otorisasi berdasarkan role. Fitur wajib yang diterapkan mencakup register/login, migration role, middleware khusus untuk route admin, Gate pengelolaan nilai, Policy untuk kepemilikan proposal, serta proteksi aksi pada Blade. Fitur pendukungnya meliputi dashboard, profil akun, peninjauan proposal, dan pengisian nilai.
 

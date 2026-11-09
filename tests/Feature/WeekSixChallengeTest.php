@@ -10,10 +10,7 @@ uses(RefreshDatabase::class);
 it('seeds fifteen students with two projects each and a lecturer portfolio', function () {
     $this->seed();
 
-    $this->assertDatabaseHas('users', [
-        'email' => 'andi@example.com',
-        'role' => 'mahasiswa',
-    ]);
+    expect(User::where('email', 'andi@example.com')->firstOrFail()->hasRole('mahasiswa'))->toBeTrue();
 
     $students = User::where('email', 'like', 'week6.mahasiswa.%@student.its.ac.id')
         ->orderBy('email')
@@ -22,14 +19,14 @@ it('seeds fifteen students with two projects each and a lecturer portfolio', fun
     expect($students)->toHaveCount(15);
 
     foreach ($students as $student) {
-        expect($student->role)->toBe('mahasiswa')
+        expect($student->hasRole('mahasiswa'))->toBeTrue()
             ->and($student->projects)->toHaveCount(2)
             ->and($student->projects->every(fn (Project $project) => $project->user_id === $student->id))->toBeTrue();
     }
 
     $lecturer = User::where('email', 'dosenpbkk@its.ac.id')->firstOrFail();
 
-    expect($lecturer->role)->toBe('dosen')
+    expect($lecturer->hasRole('dosen'))->toBeTrue()
         ->and($lecturer->projects)->toHaveCount(2)
         ->and(Hash::check('password', $lecturer->password))->toBeTrue();
 });
@@ -47,8 +44,8 @@ it('can run the database seeder repeatedly without duplicating challenge data', 
 });
 
 it('shows only the authenticated users projects on the dashboard', function () {
-    $owner = User::factory()->create(['role' => 'mahasiswa']);
-    $otherUser = User::factory()->create(['role' => 'mahasiswa']);
+    $owner = User::factory()->withRole('mahasiswa')->create();
+    $otherUser = User::factory()->withRole('mahasiswa')->create();
 
     $ownerProject = $owner->projects()->create([
         'judul' => 'Project Milik Saya',
@@ -73,7 +70,7 @@ it('provides a week six database navigation link for guests and authenticated us
         ->assertSee('Login untuk Demo Database')
         ->assertSee('href="'.route('login').'"', false);
 
-    $user = User::factory()->create(['role' => 'mahasiswa']);
+    $user = User::factory()->withRole('mahasiswa')->create();
 
     $this->actingAs($user)
         ->get(route('home'))

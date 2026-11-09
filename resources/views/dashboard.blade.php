@@ -28,7 +28,7 @@
                 @endforelse
             </section>
 
-            @if (Auth::user()->role === 'mahasiswa')
+            @role('mahasiswa')
                 <section class="mb-6 rounded-lg bg-white p-6 shadow-sm">
                     <div class="flex flex-wrap items-center justify-between gap-4">
                         <div>
@@ -61,14 +61,14 @@
             @else
                 <section class="rounded-lg bg-white p-6 shadow-sm">
                     <h3 class="text-lg font-medium text-gray-900">Selamat datang, {{ Auth::user()->name }}</h3>
-                    <p class="mt-1 text-sm text-gray-600">Peran: {{ Auth::user()->role }}</p>
-                    @if (in_array(Auth::user()->role, ['dosen', 'asdos'], true))
-                        <a class="mt-4 inline-block text-sm text-indigo-700 underline" href="{{ route('admin.index') }}">
-                            Tinjau proposal mahasiswa
+                    <p class="mt-1 text-sm text-gray-600">Peran: {{ Auth::user()->getRoleNames()->join(', ') }}</p>
+                    @hasanyrole(App\Models\User::PANEL_ROLES)
+                        <a class="mt-4 inline-block text-sm text-indigo-700 underline" href="{{ route('admin.dashboard') }}">
+                            Buka panel admin
                         </a>
-                    @endif
+                    @endhasanyrole
                 </section>
-            @endif
+            @endrole
         </div>
     </div>
 </x-app-layout>
